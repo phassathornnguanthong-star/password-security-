@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แบบจำลองความปลอดภัยของรหัสผ่าน</title>
+<style>
+:root{--bg:#e9eef2;--ink:#14263a;--mut:#5b6b7b;--card:#fff;--line:#cfd8e0;--accent:#0e6e8c;--bad:#c0392b;--warn:#d98a00;--ok:#2a8a4a;--great:#0e6e8c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans Thai","Sarabun","Leelawadee UI",Tahoma,system-ui,sans-serif;line-height:1.6}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.6rem;margin:8px 0 4px}
+.sub{color:var(--mut);margin:0 0 20px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+h2{font-size:1.1rem;margin:0 0 4px}
+.hint{color:var(--mut);font-size:.9rem;margin:0 0 12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=password]{flex:1;min-width:0;font:inherit;font-size:1.1rem;padding:10px 12px;border:2px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+input:focus{outline:none;border-color:var(--accent)}
+button{font:inherit;padding:9px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+button.ghost{background:#fff;color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible{outline:3px solid #8cc9dc;outline-offset:2px}
+.bar{height:14px;background:#e3e9ee;border-radius:7px;overflow:hidden;margin:14px 0 6px}
+.bar i{display:block;height:100%;width:0;background:var(--bad);transition:width .25s,background .25s}
+.level{font-weight:700}
+.big{font-size:2rem;font-weight:700;margin:10px 0 0;line-height:1.2}
+.big small{display:block;font-size:.85rem;font-weight:400;color:var(--mut)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+.cell{background:#f4f7f9;border-radius:8px;padding:10px 12px}
+.cell b{display:block;font-size:1.05rem}
+.cell span{color:var(--mut);font-size:.85rem}
+ul.checks{list-style:none;padding:0;margin:12px 0 0}
+ul.checks li{padding:2px 0}
+ul.checks li:before{content:"✗ ";color:var(--bad);font-weight:700}
+ul.checks li.ok:before{content:"✓ ";color:var(--ok)}
+.screen{background:#14263a;color:#d9ecf2;border-radius:8px;padding:14px;font-family:ui-monospace,Menlo,Consolas,monospace;min-height:88px;word-break:break-all;margin-top:12px}
+.screen .g{font-size:1.3rem;color:#fff}
+.screen .r{color:#9fb6c3;font-size:.85rem}
+.screen .hit{color:#7be0a3;font-weight:700}
+.screen .miss{color:#ff9c8f;font-weight:700}
+.hash{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;word-break:break-all;background:#f4f7f9;border-radius:8px;padding:8px 10px;margin:4px 0 10px}
+.lbl{font-size:.9rem;color:var(--mut);margin-top:8px}
+.tips li{margin-bottom:4px}
+.chart{width:100%;height:auto;display:block;margin-top:8px}
+.chart text{font-size:11px;fill:#5b6b7b;font-family:inherit}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.8rem;color:var(--mut);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+@media(max-width:520px){.cmp{grid-template-columns:1fr}}
+.cmp .box{background:#f4f7f9;border-radius:8px;padding:12px}
+.cmp .box.win{outline:3px solid var(--ok)}
+.cmp h3{margin:0 0 6px;font-size:.95rem}
+.cmp input{width:100%;font-size:1rem}
+.cmp .t{font-weight:700;font-size:1.15rem;margin-top:8px}
+.verdict{margin-top:12px;padding:10px 12px;border-radius:8px;background:#e3f1f5;border-left:4px solid var(--accent)}
+.theory .item{border-top:1px solid var(--line);padding:10px 0}
+.theory .item:first-of-type{border-top:0}
+.theory h3{margin:0 0 2px;font-size:1rem}
+.theory p{margin:0;color:var(--ink)}
+.theory .f{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f4f7f9;padding:6px 10px;border-radius:6px;margin-top:6px;display:inline-block;font-size:.85rem}
+.parts{margin-top:12px}
+.chip{display:inline-block;background:#e3f1f5;border-radius:6px;padding:2px 8px;margin:2px 4px 2px 0;font-size:.9rem}
+.chip small{color:var(--mut)}
+.chip.rnd{background:#eef1f4}
+footer{color:var(--mut);font-size:.8rem;text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>แบบจำลองความปลอดภัยของรหัสผ่าน</h1>
+  <p class="sub">ลองพิมพ์รหัสผ่าน แล้วดูว่าแฮกเกอร์ใช้เวลาเจาะนานแค่ไหน (ใช้รหัสสมมติเท่านั้น ไม่ต้องใส่รหัสจริง ข้อมูลไม่ถูกส่งออกจากเครื่อง)</p>
+
+  <div id="err" style="display:none;background:#fdecea;color:#8a1c12;border:1px solid #e6a39b;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:.9rem"></div>
+  <section>
+    <h2>1. ตรวจความแข็งแรง</h2>
+    <p class="hint">entropy แบบสุ่ม = ความยาว × log₂(จำนวนตัวอักษรที่เลือกใช้ได้) แต่ระบบจะหักบิตเมื่อพบคำทั่วไป ลำดับ ตัวซ้ำ หรือปี เพราะแฮกเกอร์เดาจากรูปแบบเหล่านี้ก่อน</p>
+    <div class="row" style="margin-bottom:10px">
+      <label for="speed" style="font-size:.9rem;color:var(--mut)">สถานการณ์โจมตี:</label>
+      <select id="speed" style="flex:1;min-width:0;font:inherit;padding:8px;border:2px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)">
+        <option value="100">เจาะผ่านหน้าเว็บ (ถูกจำกัดความเร็ว) ~100 ครั้ง/วินาที</option>
+        <option value="10000">ไฟล์รหัสรั่ว แฮชแบบช้า เช่น bcrypt ~10,000 ครั้ง/วินาที</option>
+        <option value="10000000000" selected>ไฟล์รหัสรั่ว แฮชแบบเร็ว ใช้ GPU ~10,000 ล้านครั้ง/วินาที</option>
+      </select>
+    </div>
+    <div class="row">
+      <input id="pw" type="password" placeholder="พิมพ์รหัสผ่านทดลอง" autocomplete="off" spellcheck="false">
+      <button class="ghost" id="toggle" type="button">แสดง</button>
+    </div>
+    <div class="bar"><i id="fill"></i></div>
+    <div>ระดับ: <span class="level" id="level">-</span></div>
+    <div class="big" id="time">-<small id="speedtxt">เวลาเฉลี่ยที่แฮกเกอร์ใช้เจาะ</small></div>
+    <div class="grid">
+      <div class="cell"><b id="len">0</b><span>ความยาว (ตัว)</span></div>
+      <div class="cell"><b id="pool">0</b><span>จำนวนตัวอักษรที่เป็นไปได้ (pool)</span></div>
+      <div class="cell"><b id="ent">0</b><span>entropy แบบสุ่มทั้งหมด (บิต)</span></div>
+      <div class="cell"><b id="ent2">0</b><span>entropy จริง หลังหักรูปแบบที่เดาได้ (บิต)</span></div>
+      <div class="cell"><b id="space">0</b><span>จำนวนรหัสที่ต้องไล่เดา</span></div>
+    </div>
+    <div class="parts" id="parts"></div>
+    <ul class="checks" id="checks"></ul>
+  </section>
+
+  <section>
+    <h2>2. กราฟ: ความยาวรหัสกับเวลาเจาะ</h2>
+    <p class="hint">แกนตั้งเป็นสเกลลอการิทึม ความสูงเพิ่ม 1 ช่วงคือเวลาเพิ่มขึ้น 10 เท่า คำนวณจากชุดตัวอักษรของรหัสที่พิมพ์ (ถ้ายังไม่พิมพ์ใช้ a-z, A-Z, 0-9) โดยสมมติว่าสุ่มทุกตัว ไม่หักรูปแบบ</p>
+    <svg class="chart" id="chart" viewBox="0 0 680 270" role="img" aria-label="กราฟแท่งเวลาเจาะรหัสตามความยาว"></svg>
+    <div class="legend"><span><i style="background:#c0392b"></i>เจาะได้ใน 1 ชั่วโมง</span><span><i style="background:#d9601a"></i>ไม่เกิน 1 ปี</span><span><i style="background:#d98a00"></i>ไม่เกิน 1,000 ปี</span><span><i style="background:#0e6e8c"></i>เกิน 1,000 ปี</span></div>
+    <p class="hint" id="chartnote" style="margin-top:8px"></p>
+  </section>
+
+  <section>
+    <h2>3. จำลองการโจมตี</h2>
+    <p class="hint">Brute force คือไล่เดาทุกแบบ ส่วน Dictionary คือเดาจากรหัสและคำยอดนิยม พร้อมกฎแปลงรูป เช่น ขึ้นต้นตัวใหญ่ ต่อท้ายตัวเลขหรือปี สลับ a เป็น @ (รหัสสั้นจำลองการเดาจริง รหัสยาวใช้โหมดเร่งเวลา)</p>
+    <div class="row">
+      <button id="bf" type="button">โจมตีแบบ Brute force</button>
+      <button id="dict" type="button">โจมตีแบบ Dictionary</button>
+      <button class="ghost" id="stop" type="button" disabled>หยุด</button>
+    </div>
+    <div class="screen" id="screen"><span class="r">กดปุ่มเพื่อเริ่มจำลอง</span></div>
+  </section>
+
+  <section>
+    <h2>4. เปรียบเทียบ: รหัสสั้นซับซ้อน กับ รหัสยาวธรรมดา</h2>
+    <p class="hint">แก้ไขช่องทั้งสองได้เลย แล้วดูว่าแบบไหนเจาะยากกว่ากัน</p>
+    <div class="cmp">
+      <div class="box" id="boxA"><h3>รหัส A (สั้นแต่ซับซ้อน)</h3><input type="text" id="cmpA" value="Xk9$mP2!" spellcheck="false"><div class="t" id="tA">-</div><div class="hint" id="eA" style="margin:0"></div></div>
+      <div class="box" id="boxB"><h3>รหัส B (ยาวแต่ธรรมดา)</h3><input type="text" id="cmpB" value="ilovemydogverymuch" spellcheck="false"><div class="t" id="tB">-</div><div class="hint" id="eB" style="margin:0"></div></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <p class="hint" style="margin-top:8px">หมายเหตุ: การเปรียบเทียบนี้หักบิตจากคำทั่วไป ลำดับ ตัวซ้ำ และปีแล้ว (สมมติว่าแฮกเกอร์มีรายการคำประมาณ 20,000 คำ) ทำให้ประโยคที่ทำจากคำง่ายๆ ได้คะแนนต่ำลงกว่าการนับแบบสุ่ม</p>
+  </section>
+
+  <section>
+    <h2>5. แฮช (Hash) และ Salt</h2>
+    <p class="hint">เว็บที่ปลอดภัยไม่เก็บรหัสจริง แต่เก็บค่าแฮชแทน การใส่ salt ทำให้รหัสเดียวกันได้แฮชไม่เหมือนกัน</p>
+    <div class="lbl">แฮช SHA-256 ของรหัส (ไม่มี salt)</div>
+    <div class="hash" id="h1">-</div>
+    <div class="lbl">Salt แบบสุ่ม <button class="ghost" id="newsalt" type="button" style="padding:3px 10px;margin-left:6px">สุ่มใหม่</button></div>
+    <div class="hash" id="salt">-</div>
+    <div class="lbl">แฮช SHA-256 ของ salt + รหัส</div>
+    <div class="hash" id="h2">-</div>
+  </section>
+
+  <section class="theory">
+    <h2>6. ทฤษฎีที่ใช้ในแบบจำลองนี้</h2>
+    <div class="item"><h3>Entropy (ความสุ่มของรหัส)</h3><p>วัดว่ารหัสเดายากแค่ไหน หน่วยเป็นบิต ยิ่งมากยิ่งเดายาก เพิ่มขึ้น 1 บิตคือจำนวนที่ต้องเดาเพิ่มเป็น 2 เท่า</p><span class="f">entropy = ความยาว × log₂(pool)</span></div>
+    <div class="item"><h3>รูปแบบที่เดาได้ (pattern)</h3><p>รหัสที่ทำจากคำทั่วไป ลำดับ เช่น abc หรือ 123 ตัวอักษรซ้ำ และปี เดาง่ายกว่าการสุ่มจริงมาก ระบบนี้จึงหักบิตส่วนเหล่านี้ออก เรียกว่า entropy จริง</p></div>
+    <div class="item"><h3>Brute force</h3><p>ไล่เดาทุกความเป็นไปได้ทีละแบบ แน่นอนว่าเจอในที่สุด แต่รหัสยาวทำให้ใช้เวลานานเกินจริง เวลาเฉลี่ยคือครึ่งหนึ่งของจำนวนทั้งหมด</p><span class="f">เวลา ≈ pool^ความยาว ÷ 2 ÷ ความเร็วเดา</span></div>
+    <div class="item"><h3>Dictionary attack</h3><p>เดาจากรหัสที่คนนิยมใช้ก่อน จึงเร็วกว่า brute force มาก การสลับตัวอักษรเป็นตัวเลข เช่น a เป็น @ ช่วยได้น้อยมาก</p></div>
+    <div class="item"><h3>สถานการณ์โจมตีต่างกัน เวลาเจาะต่างกัน</h3><p>เจาะผ่านหน้าเว็บทำได้ช้า เพราะเว็บจำกัดจำนวนครั้งที่ลอง แต่ถ้าไฟล์รหัสรั่วออกไป แฮกเกอร์เดาในเครื่องตัวเองได้เร็วมาก ลองสลับตัวเลือกในหัวข้อ 1 แล้วดูเวลาเปลี่ยนไป</p></div>
+    <div class="item"><h3>ความยาวชนะความซับซ้อน</h3><p>เพิ่มความยาว 1 ตัว คูณจำนวนที่ต้องเดาด้วยขนาด pool ส่วนการเพิ่มชนิดตัวอักษรแค่เพิ่ม pool เล็กน้อย รหัสยาวจึงคุ้มกว่า</p></div>
+    <div class="item"><h3>Hash และ Salt</h3><p>Hash คือฟังก์ชันทางเดียว แปลงรหัสเป็นค่าคงที่ที่ย้อนกลับไม่ได้ Salt คือค่าสุ่มที่ใส่เพิ่ม ทำให้รหัสเดียวกันได้แฮชต่างกัน และป้องกันการใช้ตารางแฮชสำเร็จรูปเจาะ ระบบจริงควรใช้แฮชแบบ "ช้า" เช่น bcrypt เพื่อให้แฮกเกอร์เดาได้ช้าลงมาก</p></div>
+    <div class="item"><h3>การยืนยันตัวตนสองชั้น (2FA)</h3><p>แม้รหัสผ่านรั่ว แฮกเกอร์ยังต้องมีรหัสชั้นที่สอง เช่น โค้ดจากแอป จึงเข้าบัญชีไม่ได้ง่ายๆ</p></div>
+  </section>
+
+  <section>
+    <h2>7. วิธีตั้งรหัสผ่านให้ปลอดภัย</h2>
+    <ul class="tips">
+      <li>ความยาวสำคัญที่สุด: ใช้อย่างน้อย 12 ตัว หรือใช้ประโยคยาวๆ (passphrase)</li>
+      <li>อย่าใช้คำยอดนิยมหรือวันเกิด แม้สลับเป็น p@ssw0rd ก็ถูกเดาได้</li>
+      <li>ใช้รหัสไม่ซ้ำกันในแต่ละเว็บ และใช้ตัวจัดการรหัสผ่าน</li>
+      <li>เปิดการยืนยันตัวตนสองชั้น (2FA) เสมอ</li>
+    </ul>
+  </section>
+  <footer>ผลคำนวณเป็นการประมาณเพื่อการเรียนรู้ ความเร็วโจมตีเป็นค่าสมมติที่เลือกได้ในหัวข้อ 1 รหัสภาษาไทยนับจากอักขระที่พิมพ์ได้บนแป้นพิมพ์ไทยทั่วไป (81 ตัว) และรายการคำที่ใช้หักรูปแบบมีขนาดเล็กกว่ารายการจริงของแฮกเกอร์</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const COMMON = ["123456","password","12345678","qwerty","123456789","12345","1234","111111","1234567","dragon","123123","baseball","abc123","football","monkey","letmein","shadow","master","666666","qwertyuiop","123321","mustang","1234567890","michael","654321","superman","1qaz2wsx","7777777","121212","000000","qazwsx","123qwe","killer","trustno1","jordan","jennifer","zxcvbnm","asdfgh","hunter","buster","soccer","harley","batman","andrew","tigger","sunshine","iloveyou","2000","charlie","robert","thomas","hockey","ranger","daniel","starwars","klaster","112233","george","computer","michelle","jessica","pepper","1111","zxcvbn","555555","11111111","131313","freedom","777777","pass","maggie","159753","aaaaaa","ginger","princess","joshua","cheese","amanda","summer","love","ashley","nicole","chelsea","biteme","matthew","access","yankees","987654321","dallas","austin","thunder","taylor","matrix","admin","welcome","login","passw0rd","admin123","guest"];
+let GPS = 1e10;
+const THAI_CHARS=[[0x0E01,0x0E2F],[0x0E30,0x0E39],[0x0E3F,0x0E3F],[0x0E40,0x0E4C],[0x0E50,0x0E59]].map(r=>Array.from({length:r[1]-r[0]+1},(_,i)=>String.fromCharCode(r[0]+i)).join("")).join("");
+const WORDS_EN="love like dog cat sun moon star blue red green black white happy lucky money family friend mother father sister brother baby angel heart sweet honey sugar candy cookie pizza coffee water fire snow rain summer winter spring autumn monday friday sunday school teacher student book music dance guitar piano rock king queen prince princess dragon tiger lion wolf eagle shark monkey horse rabbit panda bear fish bird bunny puppy kitty flower rose lily daisy tree forest ocean river mountain beach island city home house door key lock secret hello welcome please thanks sorry good great best super mega ultra power master boss hero ninja pirate wizard magic ghost zombie monster demon devil soldier army navy police doctor nurse artist writer player gamer gaming game play football soccer basketball baseball tennis hockey golf racing runner fast quick smart clever crazy funny silly lovely pretty beauty cute little big small tiny giant huge mighty strong brave free freedom peace dream wish hope faith trust truth life live alive forever always never maybe nothing everything someone anyone number letter word name email phone mobile apple orange banana lemon cherry grape mango berry peach melon chocolate vanilla butter bread cheese burger chicken rice noodle soup taco steak bacon yellow purple pink silver golden gold iron steel diamond crystal rainbow thunder lightning storm shadow light dark night day morning evening sunshine moonlight starlight midnight sunrise sunset toyota honda ford nokia samsung google yahoo facebook twitter youtube instagram admin user login guest root test demo temp pass password secure private public online internet computer laptop keyboard mouse screen monitor server cyber hacker hack code python java linux windows android iphone very much";
+const WORDS_TH="รัก สวัสดี ประเทศไทย กรุงเทพ ที่รัก แมว หมา ข้าว ม้า สีฟ้า ฟุตบอล มหาวิทยาลัย นักศึกษา วิศวะ วิศวกรรม รหัสผ่าน ความลับ ครอบครัว เพื่อน แม่ พ่อ น้อง พี่ สุขสันต์ สบายดี เสือ ช้าง ดอกไม้ ทะเล ภูเขา ตะวัน ดวงดาว";
+const WORDS=new Set((WORDS_EN+" "+WORDS_TH).split(/\s+/).filter(w=>w.length>=3));
+const COMMONSET=new Set(COMMON.filter(c=>c.length>=4));
+const SEQS=["abcdefghijklmnopqrstuvwxyz","0123456789","qwertyuiop","asdfghjkl","zxcvbnm","1qaz2wsx3edc"];
+const DICT_BITS=Math.log2(20000);
+
+function leet(s){return s.toLowerCase().replace(/@/g,"a").replace(/0/g,"o").replace(/1/g,"l").replace(/\$/g,"s").replace(/3/g,"e").replace(/5/g,"s").replace(/!/g,"i");}
+function isCommon(s){const l=s.toLowerCase();return COMMON.includes(l)||COMMON.includes(leet(s));}
+function poolSize(s){let p=0;if(/[a-z]/.test(s))p+=26;if(/[A-Z]/.test(s))p+=26;if(/[0-9]/.test(s))p+=10;if(/[\u0E00-\u0E7F]/.test(s))p+=THAI_CHARS.length;if(/[^A-Za-z0-9\u0E00-\u0E7F]/.test(s))p+=33;return p;}
+function fmtBig(n){if(n<1e6)return Math.round(n).toLocaleString("en-US");const e=Math.floor(Math.log10(n));return (n/Math.pow(10,e)).toFixed(2)+" × 10^"+e;}
+function fmtTime(sec){
+  if(sec<1)return "ทันที (น้อยกว่า 1 วินาที)";
+  const u=[["วินาที",60],["นาที",60],["ชั่วโมง",24],["วัน",365],["ปี",1000],["พันปี",1000],["ล้านปี",1000]];
+  let v=sec;
+  for(const [name,div] of u){ if(v<div) return Math.round(v).toLocaleString("en-US")+" "+name; v/=div; }
+  return "มากกว่าอายุของจักรวาล";
+}
+
+function showErr(e){const b=$("err");b.style.display="block";b.textContent="เกิดข้อผิดพลาดในหน้าเว็บ: "+(e&&e.message?e.message:e);}
+window.addEventListener("error",ev=>showErr(ev.message));
+function seqLike(t){const l=t.toLowerCase();return SEQS.some(q=>q.includes(l)||q.split("").reverse().join("").includes(l));}
+/* ประเมิน entropy จริง: หาส่วนที่เดาได้ง่าย (คำ รหัสยอดนิยม ลำดับ ตัวซ้ำ ปี) แล้วเลือกวิธีแบ่งที่ใช้บิตน้อยที่สุด */
+function analyzePatterns(s){
+  const n=s.length;if(!n)return{bits:0,parts:[]};
+  const rb=Math.log2(poolSize(s)||1);
+  const best=new Array(n+1).fill(Infinity),prev=new Array(n+1),kind=new Array(n+1);best[0]=0;
+  for(let i=0;i<n;i++){
+    const opt=(j,b,k)=>{if(best[i]+b<best[j]){best[j]=best[i]+b;prev[j]=i;kind[j]=k;}};
+    opt(i+1,rb,"สุ่ม");
+    for(let j=i+3;j<=Math.min(n,i+40);j++){
+      const t=s.slice(i,j),l=t.toLowerCase(),nl=leet(t);
+      for(const [c,extra] of [[l,0],[nl,2]]){
+        if(WORDS.has(c)){
+          let b=DICT_BITS+extra;
+          if(t!==l){ if(t===t.toUpperCase()||t===l[0].toUpperCase()+l.slice(1)) b+=1; else b+=t.length; }
+          opt(j,b,"คำทั่วไป");break;
+        }
+      }
+      if(COMMONSET.has(l)||COMMONSET.has(nl))opt(j,10,"รหัสยอดนิยม");
+      if(seqLike(t))opt(j,6+Math.log2(j-i),"ลำดับ");
+      if(/^(.)\1+$/.test(t))opt(j,rb+Math.log2(j-i)+1,"ตัวซ้ำ");
+      if(j-i===4&&/^(19|20|25)\d\d$/.test(t))opt(j,Math.log2(300),"ปี");
+    }
+  }
+  const parts=[];let j=n;
+  while(j>0){const i=prev[j];parts.unshift({text:s.slice(i,j),type:kind[j],bits:best[j]-best[i]});j=i;}
+  const merged=[];
+  parts.forEach(p=>{const m=merged[merged.length-1];if(m&&m.type==="สุ่ม"&&p.type==="สุ่ม"){m.text+=p.text;m.bits+=p.bits;}else merged.push({...p});});
+  return{bits:best[n],parts:merged};
+}
+function renderParts(pa){
+  if(!pa.parts.length){$("parts").innerHTML="";return;}
+  const found=pa.parts.some(p=>p.type!=="สุ่ม");
+  $("parts").innerHTML=(found?"แฮกเกอร์มองรหัสนี้เป็น: ":"ไม่พบรูปแบบที่เดาได้ง่าย แฮกเกอร์ต้องเดาทีละตัว: ")+pa.parts.map(p=>`<span class="chip ${p.type==="สุ่ม"?"rnd":""}">${esc(p.text)} <small>${p.type} ~${p.bits.toFixed(0)} บิต</small></span>`).join("");
+}
+let current={pw:"",pool:0,space:0,common:false};
+
+function analyze(){
+  const s=$("pw").value;
+  const pool=poolSize(s), rawEnt=s.length*Math.log2(pool||1);
+  let pa;try{pa=analyzePatterns(s);}catch(e){showErr(e);pa={bits:rawEnt,parts:[]};}
+  const ent=pa.bits, space=Math.pow(2,ent);
+  const common=s.length>0&&isCommon(s);
+  current={pw:s,pool,space,common};
+  $("len").textContent=s.length;$("pool").textContent=pool;$("ent").textContent=rawEnt.toFixed(1);$("ent2").textContent=ent.toFixed(1);try{renderParts(pa);}catch(e){showErr(e);}
+  $("space").textContent=s?fmtBig(space):"0";
+  let lvl,col,pct;
+  if(!s){lvl="-";col="#c0392b";pct=0;}
+  else if(common){lvl="อ่อนมาก (อยู่ในรายการรหัสยอดนิยม)";col="#c0392b";pct=6;}
+  else if(ent<28){lvl="อ่อนมาก";col="#c0392b";pct=15;}
+  else if(ent<36){lvl="อ่อน";col="#d9601a";pct=32;}
+  else if(ent<60){lvl="ปานกลาง";col="#d98a00";pct=55;}
+  else if(ent<80){lvl="แข็งแรง";col="#2a8a4a";pct=80;}
+  else{lvl="แข็งแรงมาก";col="#0e6e8c";pct=100;}
+  $("fill").style.width=pct+"%";$("fill").style.background=col;
+  $("level").textContent=lvl;$("level").style.color=col;
+  const t=!s?"-":common?"ทันที (ถูกเดาจากพจนานุกรม)":fmtTime(Math.pow(2,Math.max(ent-1,0))/GPS);
+  $("time").firstChild.nodeValue=t;
+  const checks=[
+    [s.length>=12,"ยาวอย่างน้อย 12 ตัว"],
+    [/[a-z]/.test(s)&&/[A-Z]/.test(s),"มีทั้งตัวพิมพ์เล็กและพิมพ์ใหญ่"],
+    [/[0-9]/.test(s),"มีตัวเลข"],
+    [/[^A-Za-z0-9\u0E00-\u0E7F]/.test(s),"มีสัญลักษณ์พิเศษ"],
+    [s.length>0&&!common,"ไม่อยู่ในรายการรหัสยอดนิยม"]
+  ];
+  $("checks").innerHTML=checks.map(c=>`<li class="${c[0]?"ok":""}">${c[1]}</li>`).join("");
+  updateHash();drawChart();
+}
+
+/* ---------- Attack simulation ---------- */
+let timer=null;
+function setRunning(r){$("bf").disabled=r;$("dict").disabled=r;$("stop").disabled=!r;}
+function stopSim(){if(timer){cancelAnimationFrame(timer);timer=null;}setRunning(false);}
+function charsetFor(s){let c="";if(/[a-z]/.test(s))c+="abcdefghijklmnopqrstuvwxyz";if(/[A-Z]/.test(s))c+="ABCDEFGHIJKLMNOPQRSTUVWXYZ";if(/[0-9]/.test(s))c+="0123456789";if(/[\u0E00-\u0E7F]/.test(s))c+=THAI_CHARS;if(/[^A-Za-z0-9\u0E00-\u0E7F]/.test(s))c+="!@#$%^&*()-_=+[]{};:,.<>/?~`'\"\\|";return c;}
+
+function timelapse(total){
+  setRunning(true);
+  const avg=total/2/GPS,Tmax=3.15e10,hz=Math.min(avg,Tmax),dur=7000,t0=performance.now();
+  const fmtP=q=>q<0.01?q.toExponential(1)+"%":q.toFixed(2)+"%";
+  function frame(now){
+    const tau=Math.min(1,(now-t0)/dur);
+    const vt=hz>=1?Math.pow(hz,tau):hz*tau,tries=Math.min(vt*GPS,total),pct=tries/total*100,done=tau>=1;
+    let msg="";
+    if(done)msg=avg<=Tmax?`<div class="hit">เจอรหัส (ที่เวลาเฉลี่ย) ใช้เวลา ${fmtTime(avg)}</div>`:`<div class="miss">ผ่านไป 1,000 ปีแล้วก็ยังไม่เจอ สำรวจได้เพียง ${fmtP(pct)} ของทั้งหมด</div>`;
+    $("screen").innerHTML=`<div class="r">Brute force โหมดเร่งเวลา (ความเร็ว ${GPS.toLocaleString("en-US")} ครั้ง/วินาที)</div><div class="g">ผ่านไป ${fmtTime(vt)}</div><div class="bar" style="margin:8px 0"><i style="width:${Math.max(pct,0.4)}%;background:#7be0a3"></i></div><div class="r">เดาไปแล้ว ${fmtBig(tries)} จาก ${fmtBig(total)} ครั้ง (${fmtP(pct)})</div>${msg}`;
+    if(done){stopSim();return;}
+    timer=requestAnimationFrame(frame);
+  }
+  timer=requestAnimationFrame(frame);
+}
+function bruteForce(){
+  const s=current.pw;
+  if(!s){$("screen").innerHTML='<span class="r">กรุณาพิมพ์รหัสผ่านก่อน</span>';return;}
+  const cs=charsetFor(s), n=cs.length, L=s.length, total=Math.pow(n,L);
+  if(total>3e6){timelapse(total);return;}
+  setRunning(true);
+  const idx=new Array(L).fill(0);let tries=0;const start=performance.now();
+  const step=Math.max(1,Math.ceil(total/180));
+  function next(){
+    for(let k=0;k<step;k++){
+      const guess=idx.map(i=>cs[i]).join("");tries++;
+      if(guess===s){
+        $("screen").innerHTML=`<div class="r">Brute force</div><div class="g">${esc(guess)}</div><div class="hit">เจอรหัสแล้ว! เดา ${tries.toLocaleString("en-US")} ครั้ง</div><div class="r">ใช้เวลาในการจำลอง ${((performance.now()-start)/1000).toFixed(1)} วินาที (เครื่องจริงเร็วกว่านี้มาก)</div>`;
+        stopSim();return;
+      }
+      let p=L-1;while(p>=0){idx[p]++;if(idx[p]<n)break;idx[p]=0;p--;}
+    }
+    const g=idx.map(i=>cs[i]).join("");
+    $("screen").innerHTML=`<div class="r">Brute force: กำลังไล่เดา...</div><div class="g">${esc(g)}</div><div class="r">เดาแล้ว ${tries.toLocaleString("en-US")} / ${total.toLocaleString("en-US")} ครั้ง</div>`;
+    timer=requestAnimationFrame(next);
+  }
+  next();
+}
+
+let CANDS=null;
+function buildCands(){
+  const base=[...new Set([...COMMON,...WORDS])];
+  const cap=w=>w[0].toUpperCase()+w.slice(1);
+  const lt=(w,m)=>w.replace(/[aeios]/g,c=>m[c]||c);
+  const L1={a:"@",o:"0"},L2={a:"@",o:"0",s:"$",i:"!"},L3={a:"4",e:"3",i:"1",o:"0",s:"5"};
+  const out=[];
+  for(const w of base){
+    const C=cap(w);
+    out.push([w,"คำตรงๆ"],[C,"ขึ้นต้นตัวใหญ่"],[w.toUpperCase(),"ตัวใหญ่ทั้งหมด"]);
+    for(const suf of ["1","123","!","2024","2025","2026"])out.push([w+suf,"ต่อท้าย "+suf],[C+suf,"ตัวใหญ่ + ต่อท้าย "+suf]);
+    out.push([lt(w,L1),"สลับ a→@ o→0"],[lt(w,L2),"สลับ a→@ o→0 s→$ i→!"],[lt(w,L3),"สลับเป็นเลข (leet)"],[cap(lt(w,L3)),"ตัวใหญ่ + สลับเป็นเลข"]);
+  }
+  return out;
+}
+function dictAttack(){
+  const s=current.pw;
+  if(!s){$("screen").innerHTML='<span class="r">กรุณาพิมพ์รหัสผ่านก่อน</span>';return;}
+  if(!CANDS)CANDS=buildCands();
+  const N=CANDS.length,batch=Math.ceil(N/100);let i=0;
+  setRunning(true);
+  function next(){
+    for(let k=0;k<batch&&i<N;k++,i++){
+      if(CANDS[i][0]===s){
+        $("screen").innerHTML=`<div class="r">Dictionary attack</div><div class="g">${esc(CANDS[i][0])}</div><div class="hit">เจอรหัสแล้ว! เดาไป ${(i+1).toLocaleString("en-US")} ครั้ง จากทั้งหมด ${N.toLocaleString("en-US")}</div><div class="r">กฎที่เจอ: ${CANDS[i][1]} แค่ดัดแปลงคำง่ายๆ ก็ถูกเดาได้</div>`;
+        stopSim();return;
+      }
+    }
+    if(i>=N){
+      $("screen").innerHTML=`<div class="r">Dictionary attack</div><div class="miss">ไม่พบใน ${N.toLocaleString("en-US")} รหัสที่สร้างจากคำยอดนิยม</div><div class="r">แต่แฮกเกอร์ยังใช้ brute force ต่อได้ ดูเวลาเจาะในหัวข้อที่ 1 (รายการจริงของแฮกเกอร์ใหญ่กว่านี้มาก)</div>`;
+      stopSim();return;
+    }
+    $("screen").innerHTML=`<div class="r">Dictionary attack: ลองคำยอดนิยมพร้อมกฎแปลงรูป...</div><div class="g">${esc(CANDS[i][0])}</div><div class="r">ลองแล้ว ${i.toLocaleString("en-US")} / ${N.toLocaleString("en-US")} รหัส</div>`;
+    timer=requestAnimationFrame(next);
+  }
+  next();
+}
+function esc(t){return t.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+/* ---------- Hash and salt ---------- */
+let salt="";
+function newSalt(){const a=new Uint8Array(8);(window.crypto||{}).getRandomValues?crypto.getRandomValues(a):a.forEach((_,i)=>a[i]=Math.random()*256);salt=[...a].map(b=>b.toString(16).padStart(2,"0")).join("");$("salt").textContent=salt;updateHash();}
+async function sha256(t){
+  if(window.crypto&&crypto.subtle){
+    const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));
+    return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+  }
+  return null;
+}
+async function updateHash(){
+  const s=current.pw;
+  if(!s){$("h1").textContent="-";$("h2").textContent="-";return;}
+  const a=await sha256(s), b=await sha256(salt+s);
+  $("h1").textContent=a||"เบราว์เซอร์นี้ไม่รองรับการคำนวณแฮช (ลองเปิดด้วย Chrome หรือ Safari)";
+  $("h2").textContent=b||"-";
+}
+
+/* ---------- Chart ---------- */
+function drawChart(){
+  const pool=current.pool||62, lp=Math.log10(pool);
+  const W=680,H=270,L=70,R=10,T=10,B=28,maxY=18,n=20;
+  const bw=(W-L-R)/n, sy=v=>H-B-(Math.min(Math.max(v,0),maxY)/maxY)*(H-T-B);
+  const ticks=[[0,"1 วินาที"],[3.56,"1 ชั่วโมง"],[4.94,"1 วัน"],[7.5,"1 ปี"],[10.5,"1,000 ปี"],[13.5,"1 ล้านปี"],[16.5,"1 พันล้านปี"]];
+  let s="";
+  ticks.forEach(t=>{const y=sy(t[0]);s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#dde4ea"/><text x="${L-6}" y="${y+4}" text-anchor="end">${t[1]}</text>`;});
+  for(let k=1;k<=n;k++){
+    const v=k*lp-Math.log10(2*GPS), y=sy(v), x=L+(k-1)*bw+3;
+    const col=v<3.56?"#c0392b":v<7.5?"#d9601a":v<10.5?"#d98a00":"#0e6e8c";
+    const cur=k===current.pw.length;
+    s+=`<rect x="${x}" y="${y}" width="${bw-6}" height="${H-B-y}" fill="${col}" ${cur?'stroke="#14263a" stroke-width="3"':''} rx="2"/>`;
+    s+=`<text x="${x+(bw-6)/2}" y="${H-10}" text-anchor="middle" ${cur?'style="font-weight:700;fill:#14263a"':''}>${k}</text>`;
+  }
+  s+=`<text x="${(W+L)/2}" y="${H}" text-anchor="middle" style="display:none"></text>`;
+  $("chart").innerHTML=s;
+  const len=current.pw.length;
+  $("chartnote").textContent=len?`แท่งที่มีกรอบเข้มคือรหัสของคุณ (${len} ตัว) เลขใต้แท่งคือความยาวรหัส ยิ่งยาวยิ่งสูงขึ้นอย่างรวดเร็ว`:"เลขใต้แท่งคือความยาวรหัส (ตัว) ลองพิมพ์รหัสด้านบนเพื่อดูตำแหน่งของคุณ";
+}
+
+/* ---------- Compare ---------- */
+function stat(s){
+  const pool=poolSize(s),common=s.length>0&&isCommon(s);
+  const ent=analyzePatterns(s).bits;
+  const sec=s?Math.pow(2,Math.max(ent-1,0))/GPS:0;
+  return {pool,ent,common,sec};
+}
+function compare(){try{compareInner();}catch(e){showErr(e);}}
+function compareInner(){
+  const a=stat($("cmpA").value), b=stat($("cmpB").value);
+  const show=(st,t,e,v)=>{$(t).textContent=!v?"-":st.common?"ทันที (รหัสยอดนิยม)":fmtTime(st.sec);$(e).textContent=v?`${v.length} ตัว, pool ${st.pool}, entropy จริง ${st.ent.toFixed(1)} บิต`:"";};
+  show(a,"tA","eA",$("cmpA").value);show(b,"tB","eB",$("cmpB").value);
+  const ea=a.common?0:a.ent, eb=b.common?0:b.ent;
+  $("boxA").classList.toggle("win",ea>eb);$("boxB").classList.toggle("win",eb>ea);
+  let m;
+  if(!$("cmpA").value||!$("cmpB").value)m="พิมพ์รหัสทั้งสองช่องเพื่อเปรียบเทียบ";
+  else if(ea===eb)m="ทั้งสองรหัสมี entropy ใกล้เคียงกัน";
+  else{const w=ea>eb?"A":"B",d=Math.abs(ea-eb);m=`รหัส ${w} เจาะยากกว่า เพราะมี entropy สูงกว่า ${d.toFixed(1)} บิต หรือต้องเดามากกว่าประมาณ ${fmtBig(Math.pow(2,d))} เท่า`;}
+  $("verdict").textContent=m;
+}
+$("cmpA").addEventListener("input",compare);$("cmpB").addEventListener("input",compare);
+
+function speedLabel(){
+  const m={100:"เจาะผ่านหน้าเว็บที่จำกัดความเร็ว",10000:"เจาะไฟล์รหัสรั่วที่แฮชแบบช้า (bcrypt)",10000000000:"เจาะไฟล์รหัสรั่วที่แฮชแบบเร็วด้วย GPU"};
+  $("speedtxt").textContent="เวลาเฉลี่ยที่แฮกเกอร์ใช้เจาะ ("+(m[GPS]||"")+" ความเร็ว "+GPS.toLocaleString("en-US")+" ครั้ง/วินาที)";
+}
+$("speed").addEventListener("change",()=>{GPS=+$("speed").value;stopSim();speedLabel();analyze();compare();});
+$("pw").addEventListener("input",()=>{stopSim();analyze();});
+$("toggle").addEventListener("click",()=>{const p=$("pw");const show=p.type==="password";p.type=show?"text":"password";$("toggle").textContent=show?"ซ่อน":"แสดง";});
+$("bf").addEventListener("click",bruteForce);
+$("dict").addEventListener("click",dictAttack);
+$("stop").addEventListener("click",()=>{stopSim();$("screen").innerHTML='<span class="r">หยุดการจำลองแล้ว</span>';});
+$("newsalt").addEventListener("click",newSalt);
+newSalt();speedLabel();analyze();compare();
+</script>
+</body>
+</html>
